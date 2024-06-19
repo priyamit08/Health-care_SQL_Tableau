@@ -1,0 +1,564 @@
+
+
+--------#######. Data Analyst Technical Challenge #########------------------
+
+
+Tool used:
+
+> PostgreSQL
+> Tableau public
+
+
+Tasks and Solutions:
+
+#1. Import the data: Create a SQL database using the attached CSV files
+   - ‘assignment_data_clinic_group.csv’ contains clinic group data (clinic IDs and Clinic Groups)
+   - ‘assignment_data_clinics_with_patients.csv’ contains patient/clinic data (patient IDs, clinic title, clinic IDs, patient created at date and patient deleted at date)
+   - ‘assignment_data_modules.csv’ contains module data (patient IDs, date of module generation, number of modules)
+
+Solution-#1
+
+[SQL Code]
+
+//Step1: Database creation
+
+CREATE DATABASE rehab_db;
+
+
+//Step2: Changing date format, setting the date format to match DD.MM.YY
+
+SET datestyle = 'DMY';
+
+Note: PostgreSQL expects dates in a specific format by default (YYYY-MM-DD) which was mismatching with the date in CSV file.
+So I set the datestyle in PostgreSQL to match CSV date format.
+
+
+Step3: Table creation for all 3 dataset (with Primary key and Foreign key relationship)
+
+CREATE TABLE clinic_group (
+    clinic_id VARCHAR(255) PRIMARY KEY,
+    clinic_group VARCHAR(255)
+);
+
+CREATE TABLE clinics_with_patients (
+    patient_id INT PRIMARY KEY,
+    clinic_title VARCHAR(255),
+    clinic_id VARCHAR(255),
+    patient_created_date DATE,
+    patient_deleted_date DATE,
+    FOREIGN KEY (clinic_id) REFERENCES clinic_group(clinic_id)
+);
+
+CREATE TABLE modules (
+    patient_id INT,
+    module_completion_date DATE,
+    number_of_modules INT,
+    FOREIGN KEY (patient_id) REFERENCES clinics_with_patients(patient_id)
+);
+
+
+Step4: Importing datasets into newly created table in Step3 (.csv file)
+
+//Upload data into clinic_group table
+
+COPY clinic_group(clinic_id, clinic_group)
+FROM '/Users/priyankamittal/Desktop/Data Analyst Challenge/assignment_data_clinic_group.csv'
+DELIMITER ','
+CSV HEADER;
+
+//Verifying successful data imports in clinic_group table
+
+SELECT * FROM clinic_group;
+
+Output:
+
+"clinic_id"	"clinic_group"
+"abc1"	        "Get Better Now GmbH"
+"abc2"	        "Rehab or go Home GmbH"
+"abc3"	        "Get Better Now GmbH"
+"abc4"	        "Reha group 101"
+"abc5"	        "Rehab or go Home GmbH"
+"abc6"	        "Rehab or go Home GmbH"
+"abc7"	         [null]
+"abc8"	        "Re-Freshed"
+"abc9"	        "Re-Freshed"
+"abc10"	        "Re-Freshed"
+"Abc11"          [null]
+
+//Upload data into clinics_with_patients table
+
+COPY clinics_with_patients(patient_id, clinic_title, clinic_id, patient_created_date, patient_deleted_date )
+FROM '/Users/priyankamittal/Desktop/Data Analyst Challenge/assignment_data_clinics_with_patients.csv'
+DELIMITER ','
+CSV HEADER;
+
+//Verifying successful data imports in clinics_with_patients table (output displayed for first 10 records only)
+
+SELECT * FROM clinics_with_patients
+LIMIT 10
+
+Output:
+
+"patient_id"	"clinic_title"	    "clinic_id"	   "patient_created_date"	"patient_deleted_date"
+5220	        "Rehab on the go"	"abc9"	    "2018-07-13"	            "2018-09-11"
+8389	        "Rehab 101"	        "abc11"	    "2018-10-05"	             [null]
+9550	        "Rehab on the go"	"abc9"	    "2018-10-31"                     [null]	
+9850	        "Rehab 101"	        "abc11"	    "2018-11-06"	             [null]
+8845	        "Rehab on the go"	"abc9"	    "2018-10-16"                     [null]	
+1858	        "Rehab 101"	        "abc11"     "2018-03-13"	           "2018-03-15"
+8889	        "Rehab 101"	        "abc11"     "2018-10-17"	             [null]
+8187	        "Get Better Fast"	"abc10"	    "2018-09-28"	             [null]
+8755	        "Rehab on the go"	"abc9"	    "2018-10-15"                     [null]	
+7811	        "Rehab on the go"	"abc9"	    "2018-09-20"                     [null]	
+
+//Upload data into modules table
+
+COPY modules(patient_id, module_completion_date, number_of_modules)
+FROM '/Users/priyankamittal/Desktop/Data Analyst Challenge/assignment_data_modules.csv'
+DELIMITER ','
+CSV HEADER;
+
+//Verifying successful data imports in modules table (output displayed for first 10 records only)
+
+SELECT * FROM modules
+LIMIT 10
+
+Output:
+
+"patient_id"	"module_completion_date"	"number_of_modules"
+15404	         "2019-02-24"	                            2
+15404	         "2019-03-03"	                            1
+15404	         "2019-03-10"	                            2
+15404	         "2019-03-17"	                            2
+15404	         "2019-03-24"	                            2
+15404	         "2019-03-31"	                            2
+15404	         "2019-04-07"	                            2
+15404	         "2019-04-14"	                            2
+15404	         "2019-04-21"	                            2
+15404	         "2019-04-28"	                            2
+ 
+
+
+#2. Create a dataset: use SQL to combine data from imported tables. Final table should contain following columns:
+   patient ID, clinic ID, clinic title, clinic group, patient created at date, module completion date, number of modules
+
+Solution-#2
+
+// Joining the tables clinics_with_patients and clinic_group using INNER JOIN and the resulting table with modules using LEFT JOIN
+
+CREATE TABLE combined_data AS
+SELECT
+    p.patient_id,
+    p.clinic_id,
+    p.clinic_title,
+    c.clinic_group,
+    p.patient_created_date,
+    m.module_completion_date,
+    m.number_of_modules
+FROM
+    clinics_with_patients p
+INNER JOIN
+    clinic_group c ON p.clinic_id = c.clinic_id
+LEFT JOIN
+    modules m ON p.patient_id = m.patient_id;
+
+Note:
+- An inner join is used to connect clinics_with_patients and clinic_groups because all unique clinic ID's from clinics_with_patients table have corresponding record in clinic_groups
+- A left join is used to connect resulting table from above step with modules because the module dataset only contains information for patients who have generated modules.
+- This approach also accounts for patients who have not generated any modules.
+
+//Verifying successful joining of 3 tables (output displayed for first 10 records only)
+
+SELECT * FROM combined_data
+LIMIT 10
+
+Output:
+
+"patient_id"	"clinic_id"	"clinic_title"	      "clinic_group"  "patient_created_date"	"module_completion_date"	"number_of_modules"
+15404	         "abc10"	"Get Better Fast"	"Re-Freshed"	"2019-02-01"	          "2019-02-24"	                    2
+15404	         "abc10"	"Get Better Fast"	"Re-Freshed"	"2019-02-01"	          "2019-03-03"	                    1
+15404	         "abc10"	"Get Better Fast"	"Re-Freshed"	"2019-02-01"	          "2019-03-10"	                    2
+15404	         "abc10"	"Get Better Fast"	"Re-Freshed"	"2019-02-01"	          "2019-03-17"	                    2
+15404	         "abc10"	"Get Better Fast"	"Re-Freshed"	"2019-02-01"	          "2019-03-24"	                    2
+15404	         "abc10"	"Get Better Fast"	"Re-Freshed"	"2019-02-01"	          "2019-03-31"	                    2
+15404	         "abc10"	"Get Better Fast"	"Re-Freshed"	"2019-02-01"	          "2019-04-07"	                    2
+15404	         "abc10"	"Get Better Fast"	"Re-Freshed"	"2019-02-01"	          "2019-04-14"	                    2
+15404	         "abc10"	"Get Better Fast"	"Re-Freshed"	"2019-02-01"	          "2019-04-21"	                    2
+15404	         "abc10"	"Get Better Fast"	"Re-Freshed"	"2019-02-01"	          "2019-04-28"	                    2
+
+
+Note: Total rows : 42104
+
+
+#3. Explore the dataset: perform exploratory data analysis. Include your written observations
+    Make a list of things you find ‘strange’ or things that don’t make sense. The data is not perfect...
+
+Solution-#3
+
+// Extracting summary statistics (Understanding of the data)
+
+SELECT 
+    MIN(patient_created_date) AS earliest_patient_created_date,
+    MAX(patient_created_date) AS latest_patient_created_date,
+    MIN(module_completion_date) AS earliest_module_completion_date,
+    MAX(module_completion_date) AS latest_module_completion_date,
+    MIN(number_of_modules) AS min_number_of_modules,
+    MAX(number_of_modules) AS max_number_of_modules,
+    AVG(number_of_modules) AS avg_number_of_modules
+FROM 
+    combined_data;
+
+Output:
+
+"earliest_patient_created_date"	"latest_patient_created_date"	"earliest_module_completion_date"	"latest_module_completion_date"	"min_number_of_modules"	"max_number_of_modules"	   "avg_number_of_modules"
+    "2017-11-06"	            "2021-05-05"	             "2019-02-24"	                       "2021-05-18"	                 0	               2	            0.83127063686248426254
+
+// Checking for duplicate records
+
+SELECT 
+    patient_id, clinic_id, clinic_title, clinic_group, patient_created_date, module_completion_date, number_of_modules,
+    COUNT(*) AS count_duplicates
+FROM 
+    combined_data
+GROUP BY 
+    patient_id, clinic_id, clinic_title, clinic_group, patient_created_date, module_completion_date, number_of_modules
+HAVING 
+    COUNT(*) > 1;
+
+Output
+
+"patient_id"	"clinic_id"	"clinic_title"	"clinic_group"	         "patient_created_date"	   "module_completion_date"	"number_of_modules"	"count_duplicates"
+458646	          "abc3"	"Dr. Awesome"	"Get Better Now GmbH"	   "2021-02-23"	              "2021-04-26"	                2	              2
+442075	          "abc3"	"Dr. Awesome"	"Get Better Now GmbH"	   "2021-01-08"	              "2021-04-12"	                1	              2
+442852	          "abc3"	"Dr. Awesome"	"Get Better Now GmbH"	   "2021-01-12"	              "2021-03-16"	                1	              2
+404384	          "abc3"	"Dr. Awesome"	"Get Better Now GmbH"	   "2020-08-28"	              "2020-10-22"	                1	              2
+427174	          "abc6"	"Real Rehab"	"Rehab or go Home GmbH"	   "2020-11-18"	              "2020-12-07"	                1	              2
+465002	          "abc3"	"Dr. Awesome"	"Get Better Now GmbH"	   "2021-03-09"	              "2021-04-30"	                2	              2
+428669	          "abc2"	"Dynamic Rehab"	"Rehab or go Home GmbH"	   "2020-11-20"	              "2020-12-17"	                2	              2
+
+
+
+Key Findings:
+
+- Total 7 duplicate records found in the combined data
+
+// Deleting duplicate records using internal pseudo ID available in PostgreSQL
+
+DELETE FROM combined_data
+WHERE ctid in (
+				SELECT MAX(ctid)
+				FROM combined_data
+				GROUP BY patient_id, clinic_id, clinic_title, clinic_group, patient_created_date, module_completion_date, number_of_modules
+				HAVING COUNT(*) > 1)
+
+
+Output:
+
+DELETE 7
+
+Query returned successfully in 229 msec.
+
+// Calculating total records after removing duplicates
+
+SELECT * FROM combined_data
+
+Observation : Total rows is 42097
+
+
+// Checking for Null Values
+
+SELECT 
+    SUM(CASE WHEN patient_id IS NULL THEN 1 ELSE 0 END) AS null_patient_id,
+    SUM(CASE WHEN clinic_id IS NULL THEN 1 ELSE 0 END) AS null_clinic_id,
+    SUM(CASE WHEN clinic_title IS NULL THEN 1 ELSE 0 END) AS null_clinic_title,
+    SUM(CASE WHEN clinic_group IS NULL THEN 1 ELSE 0 END) AS null_clinic_group,
+    SUM(CASE WHEN patient_created_date IS NULL THEN 1 ELSE 0 END) AS null_patient_created_date,
+    SUM(CASE WHEN module_completion_date IS NULL THEN 1 ELSE 0 END) AS null_module_completion_date,
+    SUM(CASE WHEN number_of_modules IS NULL THEN 1 ELSE 0 END) AS null_number_of_modules
+FROM 
+   combined_data;
+  
+
+Output
+
+"null_patient_id"	"null_clinic_id"	"null_clinic_title"	"null_clinic_group"	"null_patient_created_date"	"null_module_completion_date"	"null_number_of_modules"
+     0	                      0	                         0	             9286	                  0	                          16306	                       16306
+
+Key Findings:
+
+- 9,286 rows have missing clinic group value
+- 16,306 patients with no module completion record, therefore module completion date and number of modules values are not punched
+
+// Checking if null values for clinic groups can be filled using clinic group name assigned to the same clinic title in the dataset
+ 
+ SELECT 
+    clinic_group, COUNT(*) AS count, clinic_id,clinic_title
+FROM 
+    combined_data
+GROUP BY 
+    clinic_group , clinic_id,clinic_title
+ORDER BY 
+    count DESC;
+
+
+
+Output
+
+"clinic_group"	      "count"	"clinic_id"	"clinic_title"
+"Re-Freshed"	        9655	"abc9"	         "Rehab on the go"
+"Get Better Now GmbH"	9444	"abc3"	         "Dr. Awesome"
+[null]	                7018	"abc11"	         "Rehab 101"
+"Get Better Now GmbH"	4021	"abc1"	         "Fit Again"
+"Rehab or go Home GmbH"	3828	"abc6"	         "Real Rehab"
+[null]		        2268	"abc7"	         "Rehab on the hill"
+"Re-Freshed"	        2085	"abc10"	         "Get Better Fast"
+"Re-Freshed"	        1741	"abc8"	         "Tele Rehab Clinic"
+"Rehab or go Home GmbH"	1194	"abc2"	         "Dynamic Rehab"
+"Rehab or go Home GmbH"	440	"abc5"	         "Rehab Therapy"
+"Reha group 101"	410	"abc4"	         "Honest Rehab"
+
+
+Key Findings:
+
+- No clinic group assigned for all records of clinic title "Rehab 101" and "Rehab on the hill" and clinic id "abc11" and "abc7"
+
+
+// Filling NULL values for clinic_groups with 'Not assigned' as it contributes to 22 % of records and cannot be deleted
+ 
+UPDATE combined_data
+	SET clinic_group = 'Not Assigned'
+WHERE clinic_group IS NULL;
+
+// Validating all null values in clinic_group are replaced with "Not Assigned"
+
+SELECT clinic_group
+FROM combined_data
+WHERE clinic_group IS NULL
+
+
+// Filling NULL values for number_of_modules with '0' as it contributes to 38.73 % of records and cannot be deleted
+
+
+UPDATE combined_data
+	SET number_of_modules = 0
+WHERE number_of_modules IS NULL;
+
+
+Output
+
+UPDATE 16306
+
+Query returned successfully in 70 msec.
+
+
+// Validating all null values in number_of_modules are replaced with "Not Assigned"
+
+SELECT number_of_modules
+FROM combined_data
+WHERE number_of_modules IS NULL
+
+
+
+
+// Validating if module completion date is less than patient creation date (Check for Anomalous Dates)
+ 
+SELECT 
+    patient_id,
+    patient_created_date,
+    module_completion_date
+FROM 
+    combined_data
+WHERE 
+    module_completion_date < patient_created_date;
+
+Output
+No data retrieved
+
+
+
+
+// Calculating the distribution of patient accounts and number of modules with clinic_group 'Not Assigned'
+
+SELECT COUNT(DISTINCT patient_id) AS count_of_patients, SUM(number_of_modules) AS total_module, clinic_group, clinic_title
+FROM combined_data
+WHERE clinic_group = 'Not Assigned'
+GROUP BY clinic_group, clinic_title
+
+
+Output
+
+"count_of_patients"	"total_module"	"clinic_group"	  "clinic_title"
+   5038	                    3111	 "Not Assigned"	  "Rehab 101"
+   1852	                    654	         "Not Assigned"	  "Rehab on the hill"
+
+
+Key Findings:
+
+- Total 6,890 patients with no clinic group assigned
+- Total 3,765 modules with no clinic group assigned
+
+
+// Identify Patients with More Than 24 Modules count
+
+SELECT 
+    patient_id,
+    SUM(number_of_modules) AS total_modules
+FROM 
+    combined_data
+GROUP BY 
+    patient_id
+HAVING 
+    SUM(number_of_modules) > 24;
+
+Output:
+"patient_id"	"total_modules"
+359041	          28
+425721	          30
+324984	          33	
+
+Key Findings:
+
+- There are 3 parents id whose number of module is more than 24
+
+#4. Create the following visualizations in Tableau (or similar data visualisation tool):
+     Number of patient accounts created per month
+     Number of modules generated per month
+     with filtering per clinic title, year and clinic Group (bonus point for a filter to switch between week/month/quarter)
+
+Solution-#4: Priyanka_Mittal_assignment.twbx 
+
+
+#5. To assess the performance of a clinic based on the provided criteria (24 modules to complete a therapy = successful), 
+
+Solution-#5:
+	
+// Created a view(temporary table) to assess the therapy status per patient with following categories
+    - Successful: total module completed >=24
+    - On-going:  total module completed >= 1 and < 24
+    - Not Started: 0 modules
+
+
+CREATE VIEW patient_success_status AS
+SELECT 
+    patient_id,
+    clinic_id,
+    clinic_title,
+    clinic_group,
+    patient_created_date,
+    SUM(number_of_modules) AS total_modules,
+    CASE 
+        WHEN SUM(number_of_modules) >= 24 THEN 'Successful'
+		WHEN SUM(number_of_modules) = 0 THEN 'Not Started'
+        ELSE 'On-going'
+    END AS therapy_status
+FROM 
+    combined_data
+GROUP BY 
+    patient_id, clinic_id, clinic_title, clinic_group, patient_created_date;
+	
+SELECT * FROM patient_success_status
+LIMIT 10
+
+Output:
+
+"patient_id"	"clinic_id"	"clinic_title"	    "clinic_group"	       "patient_created_date"	"total_modules"	    "therapy_status"
+381297	          "abc9"	"Rehab on the go"    "Re-Freshed"	        "2020-05-15"	              0	             "Not Started"
+429377	          "abc2"	"Dynamic Rehab"	     "Rehab or go Home GmbH"	"2020-11-23"	              20	     "On-going"
+420060	          "abc2"	"Dynamic Rehab"	     "Rehab or go Home GmbH"	"2020-10-23"	              24	     "Successful"
+36616	          "abc7"	"Rehab on the hill"  "Not Assigned"	        "2019-11-18"	              0	             "Not Started"
+418026	         "abc11"	"Rehab 101"	     "Not Assigned"	        "2020-10-16"	              0	             "Not Started"
+17743	         "abc11"	"Rehab 101"	     "Not Assigned"	        "2019-03-07"	              0	             "Not Started"
+427020	         "abc6"	        "Real Rehab"	     "Rehab or go Home GmbH"	"2020-11-17"	              0              "Not Started"
+438805	         "abc11"	"Rehab 101"	     "Not Assigned"	        "2020-12-22"	              0	             "Not Started"
+473926	         "abc6"	        "Real Rehab"	     "Rehab or go Home GmbH"	"2021-03-26"	              0	             "Not Started"
+17048	         "abc11"	"Rehab 101"	     "Not Assigned"	        "2019-02-26"	              0  	     "Not Started"
+
+Key findings
+
+ - 722 patients have successfully completed their modules
+ - 1568 patients are on-going with their modules
+-  16306 patients have not started any modules yet
+
+// Aggregate the success data by clinic to determine the performance of each clinic.
+
+
+CREATE VIEW clinic_performance AS
+SELECT 
+    clinic_id,
+    clinic_title,
+    clinic_group,
+	COUNT(DISTINCT patient_id) AS total_patients,
+    SUM(CASE WHEN therapy_status = 'Successful' THEN 1 ELSE 0 END) AS successful_patients,
+    SUM(CASE WHEN therapy_status IN ('On-going', 'Not Started') THEN 1 ELSE 0 END) AS unsuccessful_patients,
+    ROUND((SUM(CASE WHEN therapy_status = 'Successful' THEN 1 ELSE 0 END) * 100.0) / COUNT(patient_id), 2) AS success_rate
+FROM 	
+    patient_success_status
+GROUP BY 
+    clinic_id, clinic_title, clinic_group;
+
+SELECT * FROM clinic_performance
+
+Output:
+"clinic_id"	"clinic_title"	      "clinic_group"	   "total_patients"	"successful_patients"	"unsuccessful_patients"	"success_rate"
+"abc1"	         "Fit Again"	      "Get Better Now GmbH"    1135	               86	                 1049	           7.58
+"abc10"	         "Get Better Fast"    "Re-Freshed"	       1335	               31	                 1304	           2.32
+"abc11"	         "Rehab 101"	      "Not Assigned"	       5038	               72	                 4966	           1.43
+"abc2"	         "Dynamic Rehab"      "Rehab or go Home GmbH"  147	               26	                 121	          17.69
+"abc3"	         "Dr. Awesome"	      "Get Better Now GmbH"    1475	               240	                 1235	          16.27
+"abc4"	         "Honest Rehab"	      "Reha group 101"	       43	               11	                  32	          25.58
+"abc5"	         "Rehab Therapy"      "Rehab or go Home GmbH"  52	               11	                  41	          21.15
+"abc6"	         "Real Rehab"	      "Rehab or go Home GmbH"  1849	               32	                 1817	          1.73
+"abc7"	         "Rehab on the hill"  "Not Assigned"	       1852	                2	                 1850	          0.11
+"abc8"	         "Tele Rehab Clinic"  "Re-Freshed"	       173	               46	                  127	          26.59
+
+
+
+// Time to Complete Therapy
+//Analyzing the average time it takes for patients to complete the therapy (24 modules) across different clinics.This can help identify clinics where patients complete their therapy faster.
+
+
+CREATE VIEW clinic_completion_time AS
+SELECT 
+    clinic_id,
+    clinic_title,
+    clinic_group,
+	patient_id,
+	MAX(module_completion_date) - patient_created_date AS no_of_days
+FROM 
+	combined_data
+GROUP BY 
+    clinic_id, clinic_title, clinic_group , patient_created_date, patient_id
+HAVING 
+    SUM(number_of_modules) >= 24;
+
+
+	
+SELECT 
+	clinic_id,
+	clinic_title,
+	clinic_group,
+	ROUND(AVG(no_of_days)) as avg_completion_days
+FROM clinic_completion_time
+GROUP BY
+	clinic_id, clinic_title, clinic_group;
+
+
+Output:
+
+"clinic_id"	"clinic_title"	        "clinic_group"	           "avg_completion_days"
+"abc2"	         "Dynamic Rehab"	"Rehab or go Home GmbH"	        174
+"abc9"	         "Rehab on the go"	"Re-Freshed"	                186
+"abc11"	         "Rehab 101"	        "Not Assigned"	                166
+"abc5"	         "Rehab Therapy"	"Rehab or go Home GmbH"	        161
+"abc1"	         "Fit Again"	        "Get Better Now GmbH"	        170
+"abc4"	         "Honest Rehab"	        "Reha group 101"	        145
+"abc10"	         "Get Better Fast"	"Re-Freshed"	                182
+"abc6"	         "Real Rehab"	        "Rehab or go Home GmbH"	        128
+"abc7"	         "Rehab on the hill"	"Not Assigned"	                106
+"abc3"	         "Dr. Awesome"	        "Get Better Now GmbH"	        161
+"abc8"	         "Tele Rehab Clinic"	"Re-Freshed"	                182
+
+Key Findings
+
+- clinic_title 'Rehab on the hill' has the least turn around time i.e 106 days
+- clinic_title 'Rehab on the go"' has the highest turn around time i.e 186 days
